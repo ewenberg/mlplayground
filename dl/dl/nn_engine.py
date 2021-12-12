@@ -1,11 +1,14 @@
-import torch 
+import torch
 import numpy as np
 from datetime import datetime
 import matplotlib.pyplot as plt
 from sklearn.preprocessing import StandardScaler
 import pickle
 
-class NNClassifier(object):
+class NNEngine():
+    """
+    A simple pytorch-based NN learning engine
+    """
     def __init__(self, model, loss_fn, optimizer):
         self.model = model
         self.loss_fn = loss_fn
@@ -25,14 +28,14 @@ class NNClassifier(object):
         self.val_losses = []
         self.total_epochs = 0
 
-        # Creates the train_step function for our model, 
+        # Creates the train_step function for our model,
         # loss function and optimizer
         # Note: there are NO ARGS there! It makes use of the class
         # attributes directly
         self.train_step = self._make_train_step()
         # Creates the val_step function for our model and loss
         self.val_step = self._make_val_step()
-    
+
     def to(self, device):
         # This method allows the user to specify a different device
         # It sets the corresponding attribute (to be used later in
@@ -51,11 +54,11 @@ class NNClassifier(object):
         # This method allows the user to define a SummaryWriter to interface with TensorBoard
         suffix = datetime.datetime.now().strftime('%Y%m%d%H%M%S')
         self.writer = SummaryWriter('{}/{}_{}'.format(folder, name, suffix))
-        
+
     def _make_train_step(self):
         # This method does not need ARGS... it can refer to
         # the attributes: self.model, self.loss_fn and self.optimizer
-        
+
         # Builds function that performs a step in the train loop
         def perform_train_step(x, y):
             # Sets model to TRAIN mode
@@ -86,15 +89,15 @@ class NNClassifier(object):
             yhat = self.model(x)
             # Step 2 - Computes the loss
             loss = self.loss_fn(yhat, y)
-            # There is no need to compute Steps 3 and 4, 
+            # There is no need to compute Steps 3 and 4,
             # since we don't update parameters during evaluation
             return loss.item()
 
         return perform_val_step
-            
+
     def _mini_batch(self, validation=False):
         # The mini-batch can be used with both loaders
-        # The argument `validation`defines which loader and 
+        # The argument `validation`defines which loader and
         # corresponding step function is going to be used
         if validation:
             data_loader = self.val_loader
@@ -106,8 +109,8 @@ class NNClassifier(object):
         if data_loader is None:
             print("No data loader available....")
             return None
-            
-        # Once the data loader and step function, this is the 
+
+        # Once the data loader and step function, this is the
         # same mini-batch loop we had before
         mini_batch_losses = []
         for x_batch, y_batch in data_loader:
@@ -119,13 +122,13 @@ class NNClassifier(object):
 
         loss = np.mean(mini_batch_losses)
         return loss
-        
+
     def set_seed(self, seed=42):
         torch.backends.cudnn.deterministic = True
-        torch.backends.cudnn.benchmark = False    
+        torch.backends.cudnn.benchmark = False
         torch.manual_seed(seed)
         np.random.seed(seed)
-        
+
     def train(self, n_epochs, seed=42):
         # To ensure reproducibility of the training process
         self.set_seed(seed)
@@ -166,7 +169,7 @@ class NNClassifier(object):
             # Closes the writer
             self.writer.flush()
         print("Total Time: {}".format(str(endtime - starttime)))
-        
+
     def save_checkpoint(self, filename):
         # Builds dictionary with all elements for resuming training
         checkpoint = {'epoch': self.total_epochs,
@@ -176,7 +179,7 @@ class NNClassifier(object):
                       'val_loss': self.val_losses}
 
         torch.save(checkpoint, filename)
-        
+
     def load_checkpoint(self, filename):
         # Loads dictionary
         checkpoint = torch.load(filename)
@@ -189,7 +192,7 @@ class NNClassifier(object):
         self.losses = checkpoint['loss']
         self.val_losses = checkpoint['val_loss']
 
-        self.model.train() # always use TRAIN for resuming training   
+        self.model.train() # always use TRAIN for resuming training
 
     def save(self, filename):
         state = {
@@ -201,20 +204,20 @@ class NNClassifier(object):
             'val_loss' : self.val_losses
         }
         torch.save(state, filename)
-        
+
     @classmethod
     def load(self, filename):
         state = torch.load(filename)
-        
+
         c = NNClassifier(state['model'], state['loss_fn'], state['optimizer'])
         c.total_epochs = state['epoch']
         c.losses = state['loss']
         c.val_losses = state['val_loss']
         return c
-        
+
     def predict(self, x):
         # Set is to evaluation mode for predictions
-        self.model.eval() 
+        self.model.eval()
         # Takes aNumpy input and make it a float tensor
         x_tensor = torch.as_tensor(x).float()
         # Send input to device and uses model for prediction
@@ -223,7 +226,7 @@ class NNClassifier(object):
         self.model.train()
         # Detaches it, brings it to CPU and back to Numpy
         return y_hat_tensor.detach().cpu().numpy()
-        
+
     def plot_losses(self):
         fig = plt.figure(figsize=(10, 4))
         plt.plot(self.losses, label='Training Loss', c='b')
@@ -234,7 +237,7 @@ class NNClassifier(object):
         plt.legend()
         plt.tight_layout()
         return fig
-        
+
     def add_graph(self):
         # Fetches a single mini-batch so we can use add_graph
         if self.train_loader and self.writer:
